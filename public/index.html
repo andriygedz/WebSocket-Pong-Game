@@ -19,6 +19,11 @@
         }
         #status {
             margin-top: 10px;
+            font-size: 1.2em;
+        }
+        #scoreBoard {
+            margin-top: 10px;
+            font-size: 1.5em;
         }
     </style>
 </head>
@@ -26,15 +31,18 @@
 <h1>WebSocket Pong Game</h1>
 <canvas id="gameCanvas" width="800" height="600"></canvas>
 <div id="status">Connecting...</div>
+<div id="scoreBoard">Left: 0 | Right: 0</div>
 
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const statusDiv = document.getElementById('status');
+    const scoreBoard = document.getElementById('scoreBoard');
 
     const paddleWidth = 20;
     const paddleHeight = 100;
     const moveSpeed = 5;
+    const ballRadius = 10;
 
     const MAX_PADDLE_Y = canvas.height - paddleHeight;
     const MIN_PADDLE_Y = 0;
@@ -45,12 +53,25 @@
         right: { x: canvas.width - paddleWidth, y: canvas.height / 2 - paddleHeight / 2 }
     };
 
+    // Ball object
+    const ball = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        radius: ballRadius
+    };
+
     // Track keys pressed
     const keysPressed = {};
+
+    // Scores
+    let scoreLeft = 0;
+    let scoreRight = 0;
 
     // Initialize WebSocket
     let socket = null;
     let player = null; // 'left' or 'right'
+    let gameOver = false;
+    let winner = null;
 
     function initWebSocket() {
         socket = new WebSocket(`ws://${window.location.host}/ws`);
@@ -85,6 +106,29 @@
                     console.warn("Received invalid rightY:", data.rightY);
                     paddles.right.y = MIN_PADDLE_Y;
                 }
+
+                if (typeof data.ballX === 'number') {
+                    ball.x = data.ballX;
+                }
+                if (typeof data.ballY === 'number') {
+                    ball.y = data.ballY;
+                }
+            } else if (data.type === 'gameover') {
+                gameOver = true;
+                winner = data.winner;
+                if (winner === player) {
+                    statusDiv.textContent = "Game Over! You won! 🎉";
+                } else {
+                    statusDiv.textContent = "Game Over! You lost. 😢";
+                }
+            } else if (data.type === 'score') {
+                if (typeof data.ScoreLeft === 'number') {
+                    scoreLeft = data.ScoreLeft;
+                }
+                if (typeof data.ScoreRight === 'number') {
+                    scoreRight = data.ScoreRight;
+                }
+                updateScoreBoard();
             } else if (data.type === 'error') {
                 statusDiv.textContent = "Game is full. Please try again later.";
             }
@@ -121,7 +165,7 @@
     });
 
     function updatePaddlePosition() {
-        if (!player) return; // Wait for assignment
+        if (!player || gameOver) return; // Wait for assignment or game over
 
         let newY = paddles[player].y;
 
@@ -168,6 +212,17 @@
         ctx.fillRect(paddles.left.x, paddles.left.y, paddleWidth, paddleHeight);
         // Right paddle
         ctx.fillRect(paddles.right.x, paddles.right.y, paddleWidth, paddleHeight);
+
+        // Draw ball
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff0000';
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    function updateScoreBoard() {
+        scoreBoard.textContent = `Left: ${scoreLeft} | Right: ${scoreRight}`;
     }
 
     function gameLoop() {
