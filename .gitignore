@@ -1,0 +1,54 @@
+
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, build output
+*.test
+*.out
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.cov
+
+# Dependency directories (comment these if you prefer to keep your vendor dir)
+vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Temporary files
+*.tmp
+
+# IDEs and editors
+# JetBrains IDEs like GoLand
+.idea/
+
+# VSCode
+.vscode/
+
+# Emacs
+*~
+
+# Vim
+*.swp
+*.swo
+*.swn
+*.swm
+*.swr
+*.sws
+
+# MacOS
+.DS_Store
+
+# Node.js modules (if you're using npm or yarn for frontend development)
+node_modules/
+
+# Logs
+*.log
+
+# Output of the build tool
+dist/
+bin/

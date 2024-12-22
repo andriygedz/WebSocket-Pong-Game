@@ -1,0 +1,9 @@
+   version: '3.8'
+
+   services:
+     websocket-game:
+       build: .
+       ports:
+         - "8080:8080"
+       container_name: websocket-game-container
+       restart: unless-stopped

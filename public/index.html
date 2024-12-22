@@ -1,0 +1,186 @@
+<!-- public/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Pong Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #222;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        #gameCanvas {
+            border: 2px solid #fff;
+            background-color: #000;
+        }
+        #status {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<h1>WebSocket Pong Game</h1>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="status">Connecting...</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusDiv = document.getElementById('status');
+
+    const paddleWidth = 20;
+    const paddleHeight = 100;
+    const moveSpeed = 5;
+
+    const MAX_PADDLE_Y = canvas.height - paddleHeight;
+    const MIN_PADDLE_Y = 0;
+
+    // Paddle objects
+    const paddles = {
+        left: { x: 0, y: canvas.height / 2 - paddleHeight / 2 },
+        right: { x: canvas.width - paddleWidth, y: canvas.height / 2 - paddleHeight / 2 }
+    };
+
+    // Track keys pressed
+    const keysPressed = {};
+
+    // Initialize WebSocket
+    let socket = null;
+    let player = null; // 'left' or 'right'
+
+    function initWebSocket() {
+        socket = new WebSocket(`ws://${window.location.host}/ws`);
+
+        socket.onopen = function() {
+            console.log("WebSocket connection established.");
+            statusDiv.textContent = "Connected. Waiting for assignment...";
+        };
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log("Received message:", data);
+            if (data.type === 'assign') {
+                player = data.player;
+                if (player === 'none') {
+                    statusDiv.textContent = "Game is full. Please try again later.";
+                    return;
+                }
+                statusDiv.textContent = `You are controlling the ${player} paddle.`;
+            } else if (data.type === 'update') {
+                // Ensure received y values are numbers
+                if (typeof data.leftY === 'number') {
+                    paddles.left.y = clampY(data.leftY);
+                } else {
+                    console.warn("Received invalid leftY:", data.leftY);
+                    paddles.left.y = MIN_PADDLE_Y;
+                }
+
+                if (typeof data.rightY === 'number') {
+                    paddles.right.y = clampY(data.rightY);
+                } else {
+                    console.warn("Received invalid rightY:", data.rightY);
+                    paddles.right.y = MIN_PADDLE_Y;
+                }
+            } else if (data.type === 'error') {
+                statusDiv.textContent = "Game is full. Please try again later.";
+            }
+        };
+
+        socket.onclose = function() {
+            console.log("WebSocket connection closed.");
+            statusDiv.textContent = "Disconnected.";
+        };
+
+        socket.onerror = function(error) {
+            console.error("WebSocket error:", error);
+            statusDiv.textContent = "WebSocket error.";
+        };
+    }
+
+    // Clamping function on client-side
+    function clampY(y) {
+        const numY = Number(y);
+        if (isNaN(numY)) {
+            console.warn("Received invalid y:", y, "Clamping to 0");
+            return MIN_PADDLE_Y;
+        }
+        return Math.max(MIN_PADDLE_Y, Math.min(MAX_PADDLE_Y, numY));
+    }
+
+    // Handle key presses
+    window.addEventListener('keydown', (e) => {
+        keysPressed[e.key] = true;
+    });
+
+    window.addEventListener('keyup', (e) => {
+        keysPressed[e.key] = false;
+    });
+
+    function updatePaddlePosition() {
+        if (!player) return; // Wait for assignment
+
+        let newY = paddles[player].y;
+
+        if (keysPressed['ArrowUp'] || keysPressed['w']) {
+            newY -= moveSpeed;
+        }
+        if (keysPressed['ArrowDown'] || keysPressed['s']) {
+            newY += moveSpeed;
+        }
+
+        // Boundary checks
+        newY = clampY(newY);
+
+        if (newY !== paddles[player].y) {
+            paddles[player].y = newY;
+            sendPaddlePosition();
+        }
+    }
+
+    function sendPaddlePosition() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            const y = paddles[player].y;
+            if (typeof y !== 'number' || isNaN(y)) {
+                console.warn("Attempted to send invalid y position:", y);
+                return;
+            }
+            const message = {
+                type: 'move',
+                player: player,
+                y: y
+            };
+            console.log("Sending message:", message);
+            socket.send(JSON.stringify(message));
+        }
+    }
+
+    function render() {
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw paddles
+        ctx.fillStyle = '#fff';
+        // Left paddle
+        ctx.fillRect(paddles.left.x, paddles.left.y, paddleWidth, paddleHeight);
+        // Right paddle
+        ctx.fillRect(paddles.right.x, paddles.right.y, paddleWidth, paddleHeight);
+    }
+
+    function gameLoop() {
+        updatePaddlePosition();
+        render();
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Initialize everything
+    window.onload = function() {
+        initWebSocket();
+        gameLoop();
+    };
+</script>
+</body>
+</html>

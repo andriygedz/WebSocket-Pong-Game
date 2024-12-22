@@ -1,0 +1,15 @@
+# Binaries
+/websocket-game
+
+# Go modules
+#/go.mod
+#/go.sum
+
+# Temporary files
+*.tmp
+*.log
+*.DS_Store
+
+# Git files
+.git
+.gitignore
